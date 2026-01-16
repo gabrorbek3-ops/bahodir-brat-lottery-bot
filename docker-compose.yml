@@ -1,0 +1,193 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: lottery-postgres
+    environment:
+      POSTGRES_DB: lottery_db
+      POSTGRES_USER: lottery_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - lottery-network
+    restart: unless-stopped
+
+  # Redis for caching and Celery
+  redis:
+    image: redis:7-alpine
+    container_name: lottery-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - lottery-network
+    restart: unless-stopped
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: lottery-backend
+    environment:
+      - DATABASE_URL=postgresql://lottery_user:${DB_PASSWORD:-changeme}@postgres:5432/lottery_db
+      - REDIS_URL=redis://redis:6379/0
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - SECRET_KEY=${SECRET_KEY}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/app/static/receipts:/app/static/receipts
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - lottery-network
+    restart: unless-stopped
+
+  # Celery Worker
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: lottery-celery-worker
+    command: celery -A app.tasks.celery worker --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql://lottery_user:${DB_PASSWORD:-changeme}@postgres:5432/lottery_db
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./backend/app:/app/app
+    depends_on:
+      - postgres
+      - redis
+      - backend
+    networks:
+      - lottery-network
+    restart: unless-stopped
+
+  # Celery Beat
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: lottery-celery-beat
+    command: celery -A app.tasks.celery beat --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql://lottery_user:${DB_PASSWORD:-changeme}@postgres:5432/lottery_db
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./backend/app:/app/app
+    depends_on:
+      - postgres
+      - redis
+      - backend
+    networks:
+      - lottery-network
+    restart: unless-stopped
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: lottery-frontend
+    ports:
+      - "3000:80"
+    volumes:
+      - ./frontend/src:/app/src
+    depends_on:
+      - backend
+    networks:
+      - lottery-network
+    restart: unless-stopped
+
+  # Telegram Bot
+  telegram-bot:
+    build:
+      context: ./bot
+      dockerfile: Dockerfile
+    container_name: lottery-telegram-bot
+    environment:
+      - BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - API_URL=http://backend:8000/api/v1
+    volumes:
+      - ./bot:/app
+    depends_on:
+      - backend
+    networks:
+      - lottery-network
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: lottery-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./docker/nginx/ssl:/etc/nginx/ssl
+      - ./frontend/dist:/usr/share/nginx/html
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - lottery-network
+    restart: unless-stopped
+
+  # Monitoring (Prometheus + Grafana)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: lottery-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - lottery-network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: lottery-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    networks:
+      - lottery-network
+    restart: unless-stopped
+
+networks:
+  lottery-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
