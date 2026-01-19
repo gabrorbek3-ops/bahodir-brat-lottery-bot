@@ -4,6 +4,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import logging
 
 from bot.services.api_client import APIClient
+from bot.config import settings
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -93,7 +94,9 @@ Egasi: {card['holder']}
                 [
                     InlineKeyboardButton(
                         text="🌐 Web App da davom etish",
-                        web_app=types.WebAppInfo(url=f"https://yourdomain.com/payment?ticket={ticket_id}")
+                        web_app=types.WebAppInfo(
+                            url=f"{settings.WEB_APP_URL.rstrip('/')}/payment?ticket={ticket_id}"
+                        )
                     )
                 ],
                 [

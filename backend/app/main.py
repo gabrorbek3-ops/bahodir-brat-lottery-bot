@@ -30,6 +30,7 @@ async def lifespan(app: FastAPI):
     
     # Create database tables
     try:
+        import app.models  # noqa: F401
         Base.metadata.create_all(bind=engine)
         logger.info("Database tables created successfully")
     except Exception as e:

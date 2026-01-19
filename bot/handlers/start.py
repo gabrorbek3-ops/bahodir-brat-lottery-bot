@@ -3,15 +3,31 @@ from aiogram.filters import Command
 from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
 
 from bot.services.api_client import APIClient
+from bot.config import settings
 
 router = Router()
 
 @router.message(Command("start"))
 async def cmd_start(message: types.Message):
     """Start command handler"""
-    
+
+    try:
+        await APIClient.upsert_telegram_user(
+            {
+                "telegram_id": message.from_user.id,
+                "username": message.from_user.username,
+                "first_name": message.from_user.first_name,
+                "last_name": message.from_user.last_name,
+                "language_code": message.from_user.language_code,
+            }
+        )
+    except Exception:
+        pass
+
     # Create Web App button
-    web_app = WebAppInfo(url=f"https://yourdomain.com/app?tg={message.from_user.id}")
+    web_app = WebAppInfo(
+        url=f"{settings.WEB_APP_URL.rstrip('/')}/app?tg={message.from_user.id}"
+    )
     
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[

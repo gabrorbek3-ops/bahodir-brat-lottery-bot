@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_WEBHOOK_URL: str = ""
     ADMIN_TELEGRAM_IDS: List[int] = []
+    TELEGRAM_CHANNEL_IDS: str = ""
+    TELEGRAM_API_BASE: str = "https://api.telegram.org"
     
     # CORS
     CORS_ORIGINS: List[str] = ["*"]

@@ -39,7 +39,7 @@ services:
       dockerfile: Dockerfile
     container_name: lottery-backend
     environment:
-      - DATABASE_URL=postgresql://lottery_user:${DB_PASSWORD:-changeme}@postgres:5432/lottery_db
+      - DATABASE_URL=${DATABASE_URL:-postgresql://lottery_user:${DB_PASSWORD:-changeme}@postgres:5432/lottery_db}
       - REDIS_URL=redis://redis:6379/0
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - SECRET_KEY=${SECRET_KEY}
@@ -63,7 +63,7 @@ services:
     container_name: lottery-celery-worker
     command: celery -A app.tasks.celery worker --loglevel=info
     environment:
-      - DATABASE_URL=postgresql://lottery_user:${DB_PASSWORD:-changeme}@postgres:5432/lottery_db
+      - DATABASE_URL=${DATABASE_URL:-postgresql://lottery_user:${DB_PASSWORD:-changeme}@postgres:5432/lottery_db}
       - REDIS_URL=redis://redis:6379/0
     volumes:
       - ./backend/app:/app/app
@@ -83,7 +83,7 @@ services:
     container_name: lottery-celery-beat
     command: celery -A app.tasks.celery beat --loglevel=info
     environment:
-      - DATABASE_URL=postgresql://lottery_user:${DB_PASSWORD:-changeme}@postgres:5432/lottery_db
+      - DATABASE_URL=${DATABASE_URL:-postgresql://lottery_user:${DB_PASSWORD:-changeme}@postgres:5432/lottery_db}
       - REDIS_URL=redis://redis:6379/0
     volumes:
       - ./backend/app:/app/app
