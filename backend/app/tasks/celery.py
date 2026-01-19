@@ -25,7 +25,7 @@ celery_app.conf.update(
     },
 )
 
+celery_app.autodiscover_tasks(["app.tasks"])
 
 def create_celery() -> Celery:
-    celery_app.autodiscover_tasks(["app.tasks"])
     return celery_app
